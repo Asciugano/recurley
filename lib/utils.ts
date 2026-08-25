@@ -11,8 +11,7 @@ export function formatCurrency(value: number, currency: string = "USD") {
   } catch (err) {
     console.error(err);
 
-    const formattedValue = value.toFixed(2);
-    return `$${formattedValue}`;
+    return value.toFixed(2);
   }
 }
 

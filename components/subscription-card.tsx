@@ -38,7 +38,9 @@ export function SubscriptionCard({
             <Text numberOfLines={1} ellipsizeMode="tail" className="sub-meta">
               {category?.trim() ||
                 plan?.trim() ||
-                (renewalDate ? formatSubscriptionDateTime(renewalDate) : "")}
+                (renewalDate
+                  ? formatSubscriptionDateTime(renewalDate)
+                  : "Not Provided")}
             </Text>
           </View>
         </View>
