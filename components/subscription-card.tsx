@@ -3,7 +3,7 @@ import {
   formatStatusLabel,
   formatSubscriptionDateTime,
 } from "@/lib/utils";
-import clsx from "clsx";
+import { clsx } from "clsx";
 import { View, Text, Image, Pressable } from "react-native";
 
 export function SubscriptionCard({
