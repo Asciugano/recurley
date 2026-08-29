@@ -7,14 +7,56 @@ import {
 import "@/global.css";
 import { useFonts } from "expo-font";
 import { useEffect, useRef } from "react";
-import { ClerkProvider, useAuth } from "@clerk/expo";
+import { ClerkProvider, useAuth, useUser } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
+import {
+  PostHogErrorBoundary,
+  PostHogProvider,
+  usePostHog,
+} from "posthog-react-native";
+import { posthog } from "@/lib/posthog";
 
 SplashScreen.preventAutoHideAsync();
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
 if (!publishableKey)
   throw new Error("Add your Clerk publishable Key to the .env");
+
+function PostHogIdentity() {
+  const posthogClient = usePostHog();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const { isLoaded: userLoaded, user } = useUser();
+  const identifiedUserId = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!authLoaded || !userLoaded) return;
+
+    if (!isSignedIn || !user) {
+      if (identifiedUserId.current) {
+        posthogClient.reset();
+        identifiedUserId.current = undefined;
+      }
+      return;
+    }
+
+    if (identifiedUserId.current === user.id) return;
+
+    if (identifiedUserId.current) {
+      posthogClient.reset();
+    }
+
+    const email = user.primaryEmailAddress?.emailAddress;
+    posthogClient.identify(user.id, {
+      $set: {
+        ...(email ? { email } : {}),
+        ...(user.fullName ? { name: user.fullName } : {}),
+      },
+    });
+    identifiedUserId.current = user.id;
+  }, [authLoaded, isSignedIn, posthogClient, user, userLoaded]);
+
+  return null;
+}
 
 function RootLayoutCountent() {
   const { isLoaded: authLoaded } = useAuth();
@@ -35,6 +77,11 @@ function RootLayoutCountent() {
         },
         {} as Record<string, string | string[]>,
       );
+
+      posthog?.screen(pathname, {
+        previout_screen: previousPathname.current ?? null,
+        ...sanitizedParams,
+      });
 
       previousPathname.current = pathname;
     }
@@ -61,9 +108,18 @@ function RootLayoutCountent() {
 }
 
 export default function RootLayout() {
+  const content = <RootLayoutCountent />;
+
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <RootLayoutCountent />
+      {posthog ? (
+        <PostHogProvider client={posthog}>
+          <PostHogIdentity />
+          <PostHogErrorBoundary>{content}</PostHogErrorBoundary>
+        </PostHogProvider>
+      ) : (
+        content
+      )}
     </ClerkProvider>
   );
 }

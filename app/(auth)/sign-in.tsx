@@ -12,6 +12,7 @@ import { useSignIn } from "@clerk/expo";
 import { useState } from "react";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 import { styled } from "nativewind";
+import { posthog } from "@/lib/posthog";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -70,6 +71,7 @@ export default function SignIn() {
           }
         },
       });
+      posthog?.capture("user_signed_in");
     } else if (signIn.status === "needs_second_factor") {
       // Handle MFA if needed (not implemented in this basic flow)
       console.log("MFA required");
@@ -98,8 +100,6 @@ export default function SignIn() {
             return;
           }
 
-          // Track successful sign-in after verification
-
           const url = decorateUrl("/(tabs)");
           if (url.startsWith("http")) {
             // Only use window.location on web platform
@@ -114,6 +114,7 @@ export default function SignIn() {
           }
         },
       });
+      posthog?.capture("user_signed_in");
     } else {
       console.error("Sign-in attempt not complete:", signIn);
     }

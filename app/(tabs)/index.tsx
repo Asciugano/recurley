@@ -15,6 +15,7 @@ import { UpcomingSubscriptionCard } from "@/components/upcoming-subscription-car
 import { SubscriptionCard } from "@/components/subscription-card";
 import { useState } from "react";
 import { useUser } from "@clerk/expo";
+import { posthog } from "@/lib/posthog";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -90,11 +91,15 @@ export default function Index() {
           <SubscriptionCard
             {...item}
             expanded={expandedSubscriptionId === item.id}
-            onPress={() =>
-              setExpandedSubscriptionId((currentId) =>
-                currentId === item.id ? null : item.id,
-              )
-            }
+            onPress={() => {
+              const expanded = expandedSubscriptionId !== item.id;
+              setExpandedSubscriptionId(expanded ? item.id : null);
+              posthog?.capture("subscription_details_toggled", {
+                subscription_id: item.id,
+                subscription_category: item.category!,
+                expanded,
+              });
+            }}
           />
         )}
         extraData={expandedSubscriptionId}
