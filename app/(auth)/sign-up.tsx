@@ -12,6 +12,7 @@ import { useSignUp, useAuth } from "@clerk/expo";
 import { useState } from "react";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 import { styled } from "nativewind";
+import { posthog } from "@/lib/posthog";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -98,6 +99,7 @@ export default function SignUp() {
           }
         },
       });
+      posthog?.capture("user_signed_up");
     } else {
       console.log("Sign-up status:", signUp.status);
     }
