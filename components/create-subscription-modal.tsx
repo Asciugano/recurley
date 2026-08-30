@@ -70,7 +70,7 @@ export default function CreateSubscriptionModal({
   function handleSubmit() {
     if (!isValidForm) return;
 
-    const priceValue = Number(price.trim());
+    const priceValue = Number(price.trim().replaceAll(",", "."));
     const now = dayjs();
     const renewalDate =
       frequency === "Monthly" ? now.add(1, "month") : now.add(1, "year");
