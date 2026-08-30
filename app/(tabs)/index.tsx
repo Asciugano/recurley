@@ -1,33 +1,74 @@
+import "@/global.css";
+import { FlatList, Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 import { styled } from "nativewind";
-import { FlatList, Image, Text, View } from "react-native";
 import images from "@/constants/images";
-import {
-  HOME_BALANCE,
-  HOME_SUBSCRIPTIONS,
-  UPCOMING_SUBSCRIPTIONS,
-} from "@/constants/data";
+import { HOME_BALANCE } from "@/constants/data";
 import { icons } from "@/constants/icons";
 import { formatCurrency } from "@/lib/utils";
 import dayjs from "dayjs";
-import { ListHeading } from "@/components/list-heading";
-import { UpcomingSubscriptionCard } from "@/components/upcoming-subscription-card";
-import { SubscriptionCard } from "@/components/subscription-card";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useUser } from "@clerk/expo";
-import { posthog } from "@/lib/posthog";
-
+import { usePostHog } from "posthog-react-native";
+import { useSubscriptionStore } from "@/lib/subscriptionStore";
+import { ListHeading } from "@/components/list-heading";
+import { SubscriptionCard } from "@/components/subscription-card";
+import { UpcomingSubscriptionCard } from "@/components/upcoming-subscription-card";
+import CreateSubscriptionModal from "@/components/create-subscription-modal";
 const SafeAreaView = styled(RNSafeAreaView);
 
-export default function Index() {
+export default function App() {
   const { user } = useUser();
+  const posthog = usePostHog();
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
   >(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const { subscriptions, addSubscription } = useSubscriptionStore();
+
+  // Get upcoming subscriptions (active subscriptions with renewal date within next 7 days)
+  const upcomingSubscriptions = useMemo(() => {
+    const now = dayjs();
+    const nextWeek = now.add(7, "days");
+    return subscriptions
+      .filter(
+        (sub) =>
+          sub.status === "active" &&
+          dayjs(sub.renewalDate).isAfter(now) &&
+          dayjs(sub.renewalDate).isBefore(nextWeek),
+      )
+      .sort((a, b) => dayjs(a.renewalDate).diff(dayjs(b.renewalDate)));
+  }, [subscriptions]);
+
+  const handleSubscriptionPress = (item: Subscription) => {
+    const isExpanding = expandedSubscriptionId !== item.id;
+    setExpandedSubscriptionId((currentId) =>
+      currentId === item.id ? null : item.id,
+    );
+    posthog.capture(
+      isExpanding ? "subscription_expanded" : "subscription_collapsed",
+      {
+        subscription_name: item.name,
+        subscription_id: item.id,
+      },
+    );
+  };
+
+  const handleCreateSubscription = (newSubscription: Subscription) => {
+    addSubscription(newSubscription);
+    posthog.capture("subscription_created", {
+      subscription_name: newSubscription.name,
+      subscription_price: newSubscription.price,
+      subscription_frequency: newSubscription.frequency!,
+      subscription_category: newSubscription.category!,
+    });
+  };
+
+  // Get user display name: firstName, fullName, or email
   const displayName =
     user?.firstName ||
     user?.fullName ||
-    user?.emailAddresses[0].emailAddress ||
+    user?.emailAddresses[0]?.emailAddress ||
     "User";
 
   return (
@@ -46,7 +87,9 @@ export default function Index() {
                 <Text className="home-user-name">{displayName}</Text>
               </View>
 
-              <Image source={icons.add} className="home-add-icon" />
+              <Pressable onPress={() => setIsModalVisible(true)}>
+                <Image source={icons.add} className="home-add-icon" />
+              </Pressable>
             </View>
 
             <View className="home-balance-card">
@@ -56,9 +99,8 @@ export default function Index() {
                 <Text className="home-balance-amount">
                   {formatCurrency(HOME_BALANCE.amount)}
                 </Text>
-
                 <Text className="home-balance-date">
-                  {dayjs(HOME_BALANCE.nextRenewalDate).format("DD/MM")}
+                  {dayjs(HOME_BALANCE.nextRenewalDate).format("MM/DD")}
                 </Text>
               </View>
             </View>
@@ -67,16 +109,19 @@ export default function Index() {
               <ListHeading title="Upcoming" />
 
               <FlatList
-                data={UPCOMING_SUBSCRIPTIONS}
+                data={upcomingSubscriptions}
                 renderItem={({ item }) => (
-                  <UpcomingSubscriptionCard {...item} />
+                  <UpcomingSubscriptionCard
+                    {...item}
+                    daysLeft={dayjs(item.renewalDate).diff(dayjs())}
+                  />
                 )}
                 keyExtractor={(item) => item.id}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 ListEmptyComponent={
                   <Text className="home-empty-state">
-                    No upcoming renewls yet.
+                    No upcoming renewals yet.
                   </Text>
                 }
               />
@@ -85,30 +130,28 @@ export default function Index() {
             <ListHeading title="All Subscriptions" />
           </>
         )}
-        data={HOME_SUBSCRIPTIONS}
+        data={subscriptions}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <SubscriptionCard
             {...item}
             expanded={expandedSubscriptionId === item.id}
-            onPress={() => {
-              const expanded = expandedSubscriptionId !== item.id;
-              setExpandedSubscriptionId(expanded ? item.id : null);
-              posthog?.capture("subscription_details_toggled", {
-                subscription_id: item.id,
-                subscription_category: item.category!,
-                expanded,
-              });
-            }}
+            onPress={() => handleSubscriptionPress(item)}
           />
         )}
         extraData={expandedSubscriptionId}
         ItemSeparatorComponent={() => <View className="h-4" />}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={() => (
+        ListEmptyComponent={
           <Text className="home-empty-state">No subscriptions yet.</Text>
-        )}
+        }
         contentContainerClassName="pb-30"
+      />
+
+      <CreateSubscriptionModal
+        visible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        onSubmit={handleCreateSubscription}
       />
     </SafeAreaView>
   );
