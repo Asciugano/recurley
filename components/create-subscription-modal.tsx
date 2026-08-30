@@ -57,7 +57,7 @@ export default function CreateSubscriptionModal({
 
   // Improved price validation
   function isValidPrice() {
-    const trimmedPrice = price.trim();
+    const trimmedPrice = price.trim().replaceAll(",", ".");
     if (!trimmedPrice) return false;
     // Strict numeric pattern check
     if (!/^\s*[+-]?(\d+(\.\d+)?|\.\d+)\s*$/.test(trimmedPrice)) return false;
@@ -163,7 +163,7 @@ export default function CreateSubscriptionModal({
                   placeholder="0.00"
                   placeholderTextColor="rgba(0, 0, 0, 0.4)"
                   value={price}
-                  onChangeText={(e) => setPrice(e.replaceAll(",", "."))}
+                  onChangeText={setPrice}
                   keyboardType="decimal-pad"
                 />
               </View>

@@ -113,7 +113,7 @@ export default function App() {
                 renderItem={({ item }) => (
                   <UpcomingSubscriptionCard
                     {...item}
-                    daysLeft={dayjs(item.renewalDate).diff(dayjs())}
+                    daysLeft={dayjs(item.renewalDate).diff(dayjs(), "days")}
                   />
                 )}
                 keyExtractor={(item) => item.id}
